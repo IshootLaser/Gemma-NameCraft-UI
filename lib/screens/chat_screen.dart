@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:fetch_client/fetch_client.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 const String botMark = 'Bot##';
 
@@ -316,9 +318,16 @@ class ChatScreenState extends State<ChatScreen> {
     });
     request.headers.addAll(headers);
 
-    http.StreamedResponse response = await request.send();
-
-    Stream<String> stringStream = response.stream.transform(utf8.decoder).transform(const LineSplitter());
+    Stream<String> stringStream;
+    if (kIsWeb) {
+      var client = FetchClient(mode: RequestMode.cors);
+      final response = await client.send(request);
+      stringStream = response.stream.transform(utf8.decoder).transform(const LineSplitter());
+    }
+    else {
+      http.StreamedResponse response = await request.send();
+      stringStream = response.stream.transform(utf8.decoder).transform(const LineSplitter());
+    }
     await for (String jsonString in stringStream) {
       jsonString = jsonString.replaceAll('data: ', '').trim();
       if (jsonString.trimRight().endsWith('[DONE]')) {
@@ -338,7 +347,7 @@ class ChatScreenState extends State<ChatScreen> {
       Future.delayed(const Duration(milliseconds: 500), () {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 500),
+          duration: const Duration(milliseconds: 50),
           curve: Curves.linear,
         );
       });
