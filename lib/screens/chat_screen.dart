@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:fetch_client/fetch_client.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:convert';
 
 const String botMark = 'Bot##';
 
@@ -235,6 +236,7 @@ class ChatScreenState extends State<ChatScreen> {
   }
 
   void _sendMessage() {
+    bool hasImage = false;
     if (_textController.text.isEmpty) {
       return;
     }
@@ -246,6 +248,7 @@ class ChatScreenState extends State<ChatScreen> {
         sendLock = true;
         if (latestImage != null) {
           _messages.add(latestImage);
+          hasImage = true;
         }
         _messages.add(_textController.text);
       });
@@ -260,7 +263,10 @@ class ChatScreenState extends State<ChatScreen> {
       });
     }
     // fakeReply();
-    getReply();
+    if (hasImage) {
+      imageToTextReply();
+    }
+    getTextReply();
   }
 
   Future<void> _getImage() async {
@@ -292,7 +298,57 @@ class ChatScreenState extends State<ChatScreen> {
     sendLock = false;
   }
 
-  Future<void> getReply() async {
+  Future<void> imageToTextReply() async {
+    _messages.add(botMark);
+    var lastMessageIndex = _messages.length - 1;
+
+    String imageBase64 = base64Encode(latestImage!);
+    var prompt = 'caption the image with great detail. try your best, do not worry about making mistakes.';
+    var headers = {
+      'Content-Type': 'application/json'
+    };
+    var request = http.Request('POST', Uri.parse('http://localhost:5443/generate'));
+    request.body = json.encode({
+      'prompt': prompt,
+      'image': imageBase64,
+    });
+    request.headers.addAll(headers);
+
+    Stream<String> stringStream;
+    if (kIsWeb) {
+      var client = FetchClient(mode: RequestMode.cors);
+      final response = await client.send(request);
+      stringStream = response.stream.transform(utf8.decoder).transform(const LineSplitter());
+    }
+    else {
+      http.StreamedResponse response = await request.send();
+      stringStream = response.stream.transform(utf8.decoder).transform(const LineSplitter());
+    }
+
+    await for (String jsonString in stringStream) {
+      jsonString = jsonString.replaceAll('data: ', '').trim();
+      if (jsonString.isEmpty) {
+        continue;
+      }
+      final jsonMap = jsonDecode(jsonString);
+      var content = jsonMap['payload'] as String;
+
+      setState(() {
+        _messages[lastMessageIndex] += content;
+      });
+
+      Future.delayed(const Duration(milliseconds: 500), () {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 50),
+          curve: Curves.linear,
+        );
+      });
+    }
+    sendLock = false;
+  }
+
+  Future<void> getTextReply() async {
     var userMsg = _messages.last;
     _messages.add(botMark);
     var lastMessageIndex = _messages.length - 1;
