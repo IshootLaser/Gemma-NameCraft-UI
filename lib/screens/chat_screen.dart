@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -7,9 +8,9 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:fetch_client/fetch_client.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:convert';
 
 const String botMark = 'Bot##';
+
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -24,6 +25,8 @@ class ChatScreenState extends State<ChatScreen> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool sendLock = false;
+  String ollamaUrl = const String.fromEnvironment('ollama_url', defaultValue: 'localhost:11434');
+  String paligemmaUrl = const String.fromEnvironment('paligemma_url', defaultValue: 'localhost:5443');
 
   late final _focusNode = FocusNode(
     onKey: (FocusNode node, RawKeyEvent evt) {
@@ -235,8 +238,8 @@ class ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  void _sendMessage() {
-    bool hasImage = false;
+  Future<void> _sendMessage() async {
+    Uint8List? img;
     if (_textController.text.isEmpty) {
       return;
     }
@@ -248,7 +251,7 @@ class ChatScreenState extends State<ChatScreen> {
         sendLock = true;
         if (latestImage != null) {
           _messages.add(latestImage);
-          hasImage = true;
+          img = latestImage;
         }
         _messages.add(_textController.text);
       });
@@ -263,8 +266,8 @@ class ChatScreenState extends State<ChatScreen> {
       });
     }
     // fakeReply();
-    if (hasImage) {
-      imageToTextReply();
+    if (img != null) {
+      await imageToTextReply(img);
     }
     getTextReply();
   }
@@ -298,16 +301,31 @@ class ChatScreenState extends State<ChatScreen> {
     sendLock = false;
   }
 
-  Future<void> imageToTextReply() async {
-    _messages.add(botMark);
-    var lastMessageIndex = _messages.length - 1;
-
-    String imageBase64 = base64Encode(latestImage!);
-    var prompt = 'caption the image with great detail. try your best, do not worry about making mistakes.';
+  Future<void> ollamaUnload() async {
     var headers = {
       'Content-Type': 'application/json'
     };
-    var request = http.Request('POST', Uri.parse('http://localhost:5443/generate'));
+    var request = http.Request('POST', Uri.parse('http://$ollamaUrl/api/generate'));
+    request.body = json.encode({
+      "model": "gemma2-2b-Chinese",
+      "keep_alive": 0,
+    });
+    request.headers.addAll(headers);
+    request.send();
+  }
+
+  Future<void> imageToTextReply(Uint8List? img) async {
+    await ollamaUnload();
+
+    _messages.add(botMark);
+    var lastMessageIndex = _messages.length - 1;
+
+    String imageBase64 = base64Encode(img!);
+    var prompt = 'caption en in great detail';
+    var headers = {
+      'Content-Type': 'application/json',
+    };
+    var request = http.Request('POST', Uri.parse('http://$paligemmaUrl/generate'));
     request.body = json.encode({
       'prompt': prompt,
       'image': imageBase64,
@@ -330,6 +348,7 @@ class ChatScreenState extends State<ChatScreen> {
       if (jsonString.isEmpty) {
         continue;
       }
+      print(jsonString);
       final jsonMap = jsonDecode(jsonString);
       var content = jsonMap['payload'] as String;
 
@@ -356,7 +375,7 @@ class ChatScreenState extends State<ChatScreen> {
     var headers = {
       'Content-Type': 'application/json'
     };
-    var request = http.Request('POST', Uri.parse('http://localhost:11434/v1/chat/completions'));
+    var request = http.Request('POST', Uri.parse('http://$ollamaUrl/v1/chat/completions'));
     request.body = json.encode({
       "model": "gemma2-2b-Chinese",
       "stream": true,
@@ -400,7 +419,7 @@ class ChatScreenState extends State<ChatScreen> {
         _messages[lastMessageIndex] += content;
       });
 
-      Future.delayed(const Duration(milliseconds: 500), () {
+      Future.delayed(const Duration(milliseconds: 10), () {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
           duration: const Duration(milliseconds: 50),
