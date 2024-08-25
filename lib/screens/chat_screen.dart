@@ -26,6 +26,7 @@ class ChatScreenState extends State<ChatScreen> {
   bool sendLock = false;
   String ollamaUrl = const String.fromEnvironment('ollama_url', defaultValue: 'localhost:11434');
   String paligemmaUrl = const String.fromEnvironment('paligemma_url', defaultValue: 'localhost:5443');
+  bool ollamaUnloaded = false;
 
   late final _focusNode = FocusNode(
     onKey: (FocusNode node, RawKeyEvent evt) {
@@ -171,6 +172,7 @@ class ChatScreenState extends State<ChatScreen> {
                     if (sendLock) {
                       return;
                     }
+                    modelSwap();
                     _getImage();
                     _focusNode.requestFocus();
                   },
@@ -287,8 +289,6 @@ class ChatScreenState extends State<ChatScreen> {
         latestImage = pickedFile.files.first.bytes;
       });
     }
-    await ollamaUnload();
-    paligemmaPreload();
   }
 
   Future<void> fakeReply() async {
@@ -308,6 +308,9 @@ class ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> ollamaUnload() async {
+    if (ollamaUnloaded) {
+      return;
+    }
     var headers = {
       'Content-Type': 'application/json'
     };
@@ -320,6 +323,7 @@ class ChatScreenState extends State<ChatScreen> {
       headers: headers,
       body: body,
     );
+    ollamaUnloaded = true;
   }
 
   Future<void> imageToTextReply(Uint8List? img) async {
@@ -370,7 +374,6 @@ class ChatScreenState extends State<ChatScreen> {
       });
       await Future.delayed(const Duration(milliseconds: 11));
     }
-    sendLock = false;
   }
 
   Future<void> getTextReply() async {
@@ -435,10 +438,16 @@ class ChatScreenState extends State<ChatScreen> {
       // wait for the animation to finish
       await Future.delayed(const Duration(milliseconds: 11));
     }
+    ollamaUnloaded = false;
     sendLock = false;
   }
 
   Future<void> paligemmaPreload() async {
     await http.get(Uri.parse('http://$paligemmaUrl/preload'));
+  }
+
+  Future<void> modelSwap() async {
+    await ollamaUnload();
+    paligemmaPreload();
   }
 }
