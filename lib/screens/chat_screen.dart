@@ -290,6 +290,7 @@ class ChatScreenState extends State<ChatScreen> {
     if (pickedFile != null) {
       setState(() {
         latestImage = pickedFile.files.first.bytes;
+        ollamaUnload();
       });
     }
   }
@@ -326,8 +327,6 @@ class ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> imageToTextReply(Uint8List? img) async {
-    await ollamaUnload();
-
     _messages.add(botMark);
     var lastMessageIndex = _messages.length - 1;
 

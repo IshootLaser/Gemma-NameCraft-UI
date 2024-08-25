@@ -17,6 +17,7 @@ class HealthCheckScreenState extends State<HealthCheckScreen> {
   bool gemmaCheck = false;
   bool paligemmaCheck = false;
   bool databaseCheck = false;
+  bool backendCheck = false;
 
   @override
   void initState() {
@@ -40,9 +41,10 @@ class HealthCheckScreenState extends State<HealthCheckScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildCheckItem('Infinity Check', infinityCheck),
-                  _buildCheckItem('Gemma Check', gemmaCheck),
-                  _buildCheckItem('Paligemma Check', paligemmaCheck),
+                  _buildCheckItem('Backend Check', backendCheck),
+                  _buildCheckItem('Infinity Server Check', infinityCheck),
+                  _buildCheckItem('Gemma API Check', gemmaCheck),
+                  _buildCheckItem('Paligemma API Check', paligemmaCheck),
                   _buildCheckItem('Database Check', databaseCheck),
                 ],
               ),
@@ -105,6 +107,7 @@ class HealthCheckScreenState extends State<HealthCheckScreen> {
           gemmaCheck = body['gemma'] == true;
           paligemmaCheck = body['paligemma'] == true;
           databaseCheck = body['database'] == true;
+          backendCheck = true;
         });
       },
     ).catchError((e) {
