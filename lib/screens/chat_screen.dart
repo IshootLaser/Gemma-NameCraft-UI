@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -41,12 +40,6 @@ class ChatScreenState extends State<ChatScreen> {
       }
     },
   );
-
-  @override
-  void initState() {
-    super.initState();
-    ollamaUnload();
-  }
 
   @override
   void dispose() {
@@ -175,6 +168,9 @@ class ChatScreenState extends State<ChatScreen> {
                 IconButton(
                   icon: const Icon(Icons.file_upload),
                   onPressed: () {
+                    if (sendLock) {
+                      return;
+                    }
                     _getImage();
                     _focusNode.requestFocus();
                   },
@@ -286,13 +282,13 @@ class ChatScreenState extends State<ChatScreen> {
         type: FileType.custom, allowedExtensions: ['jpg', 'jpeg', 'png'], withData: true
     );
 
-
     if (pickedFile != null) {
       setState(() {
         latestImage = pickedFile.files.first.bytes;
-        ollamaUnload();
       });
     }
+    await ollamaUnload();
+    paligemmaPreload();
   }
 
   Future<void> fakeReply() async {
@@ -440,5 +436,9 @@ class ChatScreenState extends State<ChatScreen> {
       await Future.delayed(const Duration(milliseconds: 11));
     }
     sendLock = false;
+  }
+
+  Future<void> paligemmaPreload() async {
+    await http.get(Uri.parse('http://$paligemmaUrl/preload'));
   }
 }
