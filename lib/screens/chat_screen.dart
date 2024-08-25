@@ -174,7 +174,10 @@ class ChatScreenState extends State<ChatScreen> {
               children: [
                 IconButton(
                   icon: const Icon(Icons.file_upload),
-                  onPressed: _getImage,
+                  onPressed: () {
+                    _getImage();
+                    _focusNode.requestFocus();
+                  },
                 ),
                 SizedBox(
                   width: 58,
