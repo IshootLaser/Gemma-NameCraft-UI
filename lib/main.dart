@@ -1,3 +1,4 @@
+import 'package:chatbot_ui/screens/health_check.dart';
 import 'package:flutter/material.dart';
 import 'package:chatbot_ui/screens/chat_screen.dart';
 
@@ -16,7 +17,11 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      home: const ChatScreen(),
+      initialRoute: '/health-check',
+      routes: {
+        '/health-check': (context) => const HealthCheckScreen(),
+        '/chat': (context) => const ChatScreen(),
+      },
       debugShowCheckedModeBanner: false,
     );
   }

@@ -43,6 +43,12 @@ class ChatScreenState extends State<ChatScreen> {
   );
 
   @override
+  void initState() {
+    super.initState();
+    ollamaUnload();
+  }
+
+  @override
   void dispose() {
     _focusNode.dispose();
     super.dispose();
@@ -364,6 +370,7 @@ class ChatScreenState extends State<ChatScreen> {
           curve: Curves.linear,
         );
       });
+      await Future.delayed(const Duration(milliseconds: 11));
     }
     sendLock = false;
   }
@@ -420,13 +427,15 @@ class ChatScreenState extends State<ChatScreen> {
         _messages[lastMessageIndex] += content;
       });
 
-      Future.delayed(const Duration(milliseconds: 10), () {
+      Future.delayed(const Duration(milliseconds: 50), () {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 50),
+          duration: const Duration(milliseconds: 10),
           curve: Curves.linear,
         );
       });
+      // wait for the animation to finish
+      await Future.delayed(const Duration(milliseconds: 11));
     }
     sendLock = false;
   }
