@@ -305,13 +305,15 @@ class ChatScreenState extends State<ChatScreen> {
     var headers = {
       'Content-Type': 'application/json'
     };
-    var request = http.Request('POST', Uri.parse('http://$ollamaUrl/api/generate'));
-    request.body = json.encode({
+    var body = json.encode({
       "model": "gemma2-2b-Chinese",
       "keep_alive": 0,
     });
-    request.headers.addAll(headers);
-    request.send();
+    await http.post(
+      Uri.parse('http://$ollamaUrl/api/generate'),
+      headers: headers,
+      body: body,
+    );
   }
 
   Future<void> imageToTextReply(Uint8List? img) async {
@@ -348,7 +350,6 @@ class ChatScreenState extends State<ChatScreen> {
       if (jsonString.isEmpty) {
         continue;
       }
-      print(jsonString);
       final jsonMap = jsonDecode(jsonString);
       var content = jsonMap['payload'] as String;
 
@@ -356,10 +357,10 @@ class ChatScreenState extends State<ChatScreen> {
         _messages[lastMessageIndex] += content;
       });
 
-      Future.delayed(const Duration(milliseconds: 500), () {
+      Future.delayed(const Duration(milliseconds: 50), () {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 50),
+          duration: const Duration(milliseconds: 10),
           curve: Curves.linear,
         );
       });
