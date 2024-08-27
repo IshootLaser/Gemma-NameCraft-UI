@@ -9,6 +9,24 @@ import 'package:fetch_client/fetch_client.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 const String botMark = 'Bot##';
+const String defaultSysMsg = '''
+你的名字叫杰玛-南瓜(Gemma NameCraft)，你是一个帮助新生儿父母取名字的超级AI智能体。你负责和新生儿父母沟通，帮助他们找到最适合的名字。尽量使用中文回答，除非必要，不要使用英文。
+''';
+const String defaultGreeting = '''
+你好！我是你的中文取名助手，我叫杰玛-南瓜(Gemma NameCraft)。请问有什么可以帮您的？
+''';
+const Map<String, dynamic> injectedPayload = {
+  '_last_name': '王',
+  '_first_name': '哪跑',
+  '_year': 2024,
+  '_month': 1,
+  '_day': 1,
+  '_hour': 12,
+  '_minute': 13,
+  '_province': '青海',
+  '_city': '西宁',
+  'is_boy': true,
+};
 
 
 class ChatScreen extends StatefulWidget {
@@ -19,14 +37,15 @@ class ChatScreen extends StatefulWidget {
 }
 
 class ChatScreenState extends State<ChatScreen> {
-  List<dynamic> _messages = ['$botMark你好！我是你的中文取名助手。请问有什么可以帮您的？'];
+  List<dynamic> _messages = ['$botMark$defaultGreeting'];
   Uint8List? latestImage;
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool sendLock = false;
-  String ollamaUrl = const String.fromEnvironment('ollama_url', defaultValue: 'localhost:11434');
+  String ollamaUrl = const String.fromEnvironment('ollama_url', defaultValue: 'localhost:18544');
   String paligemmaUrl = const String.fromEnvironment('paligemma_url', defaultValue: 'localhost:5443');
   bool ollamaUnloaded = false;
+  List<Map<String, String>> chatHistory = [];
 
   late final _focusNode = FocusNode(
     onKey: (FocusNode node, RawKeyEvent evt) {
@@ -229,10 +248,14 @@ class ChatScreenState extends State<ChatScreen> {
                   child: const Text('Send'),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.refresh),
+                  icon: const Icon(Icons.clear_all_rounded),
                   onPressed: () {
+                    if (sendLock) {
+                      return;
+                    }
                     setState(() {
-                      _messages = [botMark + 'How can I help?'];
+                      _messages = [botMark + defaultGreeting];
+                      chatHistory = [];
                     });
                     latestImage = null;
                   },
@@ -247,6 +270,7 @@ class ChatScreenState extends State<ChatScreen> {
 
   Future<void> _sendMessage() async {
     Uint8List? img;
+    String? msg;
     if (_textController.text.isEmpty) {
       return;
     }
@@ -272,11 +296,12 @@ class ChatScreenState extends State<ChatScreen> {
         );
       });
     }
-    // fakeReply();
     if (img != null) {
-      await imageToTextReply(img);
+      String caption = await imageToTextReply(img);
+      caption = await translateCaption(caption);
+      msg = '$caption<imageCaption>用户上传了一张照片,同时问道：${_messages.last}\n用户可能想结合图片和文字像你提问。你的回复是：';
     }
-    getTextReply();
+    getTextReply(msg);
   }
 
   Future<void> _getImage() async {
@@ -326,7 +351,7 @@ class ChatScreenState extends State<ChatScreen> {
     ollamaUnloaded = true;
   }
 
-  Future<void> imageToTextReply(Uint8List? img) async {
+  Future<String> imageToTextReply(Uint8List? img) async {
     _messages.add(botMark);
     var lastMessageIndex = _messages.length - 1;
 
@@ -374,31 +399,27 @@ class ChatScreenState extends State<ChatScreen> {
       });
       await Future.delayed(const Duration(milliseconds: 11));
     }
+    return _messages.last.replaceAll(botMark, '');
   }
 
-  Future<void> getTextReply() async {
-    var userMsg = _messages.last;
+  Future<void> getTextReply(String? msg) async {
+    var userMsg = msg ?? _messages.last;
     _messages.add(botMark);
     var lastMessageIndex = _messages.length - 1;
+    chatHistory.add({'role': 'system', 'content': defaultSysMsg});
+    chatHistory.add({'role': 'user', 'content': userMsg});
+
 
     var headers = {
       'Content-Type': 'application/json'
     };
-    var request = http.Request('POST', Uri.parse('http://$ollamaUrl/v1/chat/completions'));
+    var request = http.Request('POST', Uri.parse('http://$ollamaUrl/chat/main'));
     request.body = json.encode({
       "model": "gemma2-2b-Chinese",
       "stream": true,
       "max_tokens": 512,
-      "messages": [
-        {
-          "role": "system",
-          "content": "你用中文和用户聊天."
-        },
-        {
-          "role": "user",
-          "content": userMsg
-        }
-      ]
+      "messages": chatHistory,
+      "injected_payload": injectedPayload,
     });
     request.headers.addAll(headers);
 
@@ -438,6 +459,7 @@ class ChatScreenState extends State<ChatScreen> {
       // wait for the animation to finish
       await Future.delayed(const Duration(milliseconds: 11));
     }
+    chatHistory.add({'role': 'assistant', 'content': _messages.last.replaceAll(botMark, '')});
     ollamaUnloaded = false;
     sendLock = false;
   }
@@ -449,5 +471,54 @@ class ChatScreenState extends State<ChatScreen> {
   Future<void> modelSwap() async {
     await ollamaUnload();
     paligemmaPreload();
+  }
+
+  Future<String> translateCaption(String caption) async {
+    String transcription = '';
+    _messages.last += '  \n中文翻译：';
+    var headers = {
+      'Content-Type': 'application/json'
+    };
+    var request = http.Request('POST', Uri.parse('http://$ollamaUrl/transcribe'));
+    request.body = json.encode({
+      "prompt": caption,
+      "stream": true
+    });
+    request.headers.addAll(headers);
+
+    Stream<String> stringStream;
+    if (kIsWeb) {
+      var client = FetchClient(mode: RequestMode.cors);
+      final response = await client.send(request);
+      stringStream = response.stream.transform(utf8.decoder).transform(const LineSplitter());
+    }
+    else {
+      http.StreamedResponse response = await request.send();
+      stringStream = response.stream.transform(utf8.decoder).transform(const LineSplitter());
+    }
+    await for (String jsonString in stringStream) {
+      jsonString = jsonString.replaceAll('data: ', '').trim();
+      if (jsonString.isEmpty) {
+        continue;
+      }
+      final jsonMap = jsonDecode(jsonString);
+      var content = jsonMap['response'] as String;
+      transcription += content;
+
+      setState(() {
+        _messages.last += content;
+      });
+
+      Future.delayed(const Duration(milliseconds: 50), () {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 10),
+          curve: Curves.linear,
+        );
+      });
+      // wait for the animation to finish
+      await Future.delayed(const Duration(milliseconds: 11));
+    }
+    return transcription;
   }
 }
