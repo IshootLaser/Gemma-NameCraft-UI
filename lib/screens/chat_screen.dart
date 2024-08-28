@@ -261,6 +261,25 @@ class ChatScreenState extends State<ChatScreen> {
                     latestImage = null;
                   },
                 ),
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: () {
+                    if (sendLock) {
+                      return;
+                    }
+                    var chatLastIndex = chatHistory.length - 1;
+                    var messageLastIndex = _messages.length - 1;
+                    var usrMsg = chatHistory[chatLastIndex - 1]['content'];
+                    setState(() {
+                      _messages.removeAt(messageLastIndex);
+                    });
+                    chatHistory.removeAt(chatLastIndex);
+                    chatHistory.removeAt(chatLastIndex - 1);
+                    chatHistory.removeAt(chatLastIndex - 2);
+                    sendLock = true;
+                    getTextReply(usrMsg);
+                  },
+                ),
               ],
             ),
           ),
@@ -365,6 +384,7 @@ class ChatScreenState extends State<ChatScreen> {
     request.body = json.encode({
       'prompt': prompt,
       'image': imageBase64,
+      'sample': true
     });
     request.headers.addAll(headers);
 
