@@ -42,7 +42,8 @@ class ChatScreenState extends State<ChatScreen> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool sendLock = false;
-  String ollamaUrl = const String.fromEnvironment('ollama_url', defaultValue: 'localhost:18544');
+  String backendUrl = const String.fromEnvironment('backend_url', defaultValue: 'localhost:5418');
+  String ollamaUrl = const String.fromEnvironment('ollama_url', defaultValue: 'localhost:11434');
   String paligemmaUrl = const String.fromEnvironment('paligemma_url', defaultValue: 'localhost:5443');
   bool ollamaUnloaded = false;
   List<Map<String, String>> chatHistory = [];
@@ -413,7 +414,7 @@ class ChatScreenState extends State<ChatScreen> {
     var headers = {
       'Content-Type': 'application/json'
     };
-    var request = http.Request('POST', Uri.parse('http://$ollamaUrl/chat/main'));
+    var request = http.Request('POST', Uri.parse('http://$backendUrl/chat/main'));
     request.body = json.encode({
       "model": "gemma2-2b-Chinese",
       "stream": true,
@@ -479,7 +480,7 @@ class ChatScreenState extends State<ChatScreen> {
     var headers = {
       'Content-Type': 'application/json'
     };
-    var request = http.Request('POST', Uri.parse('http://$ollamaUrl/transcribe'));
+    var request = http.Request('POST', Uri.parse('http://$backendUrl/transcribe'));
     request.body = json.encode({
       "prompt": caption,
       "stream": true

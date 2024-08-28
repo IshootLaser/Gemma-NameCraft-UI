@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:http/http.dart' as http;
@@ -18,6 +17,7 @@ class HealthCheckScreenState extends State<HealthCheckScreen> {
   bool paligemmaCheck = false;
   bool databaseCheck = false;
   bool backendCheck = false;
+  bool checkHealth = true;
 
   @override
   void initState() {
@@ -51,6 +51,7 @@ class HealthCheckScreenState extends State<HealthCheckScreen> {
               SizedBox(height: tenPercentHeight),
               ElevatedButton(
                 onPressed: () {
+                  checkHealth = false;
                   Navigator.pushNamed(context, '/chat');
                 },
                 style: ElevatedButton.styleFrom(
@@ -84,7 +85,7 @@ class HealthCheckScreenState extends State<HealthCheckScreen> {
   }
 
   Future<void> startHealthCheck() async {
-    while (true) {
+    while (checkHealth) {
       if (infinityCheck && gemmaCheck && paligemmaCheck && databaseCheck) {
         break;
       }
