@@ -1,6 +1,5 @@
 FROM ghcr.io/cirruslabs/flutter:3.24.0
 
-RUN addgroup --system appgroup && adduser --system appuser --ingroup appgroup
 ### Copying the files to the /app/ directory and setting it as the working directory.
 #
 RUN mkdir /app/
@@ -20,4 +19,4 @@ RUN flutter config --enable-web
 ### The --web-renderer=auto flag allows Flutter to automatically choose the appropriate web renderer (HTML or Canvas) based on the platform and browser capabilities.
 #
 RUN flutter build web --release --web-renderer=auto
-#USER appuser:appgroup
+RUN flutter pub get

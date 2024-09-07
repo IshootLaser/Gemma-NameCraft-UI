@@ -2,3 +2,7 @@
 ./build
 ./idea
 .gitignore
+linux/
+test/
+windows/
+Dockerfile

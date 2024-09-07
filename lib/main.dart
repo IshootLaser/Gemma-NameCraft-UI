@@ -22,7 +22,6 @@ class MyApp extends StatelessWidget {
         '/health-check': (context) => const HealthCheckScreen(),
         '/chat': (context) => const ChatScreen(),
       },
-      debugShowCheckedModeBanner: false,
     );
   }
 }
