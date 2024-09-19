@@ -9,24 +9,12 @@ import 'package:fetch_client/fetch_client.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 const String botMark = 'Bot##';
-const String defaultSysMsg = '''
-你的名字叫杰玛-南瓜(Gemma NameCraft)，你是一个帮助新生儿父母取名字的超级AI智能体。你负责和新生儿父母沟通，帮助他们找到最适合的名字。尽量使用中文回答，除非必要，不要使用英文。
+String defaultSysMsg = '''
+你是一个善于助人的人工助手。
 ''';
-const String defaultGreeting = '''
-你好！我是你的中文取名助手，我叫杰玛-南瓜(Gemma NameCraft)。请问有什么可以帮您的？
-''';
-const Map<String, dynamic> injectedPayload = {
-  '_last_name': '王',
-  '_first_name': '哪跑',
-  '_year': 2024,
-  '_month': 1,
-  '_day': 1,
-  '_hour': 12,
-  '_minute': 13,
-  '_province': '青海',
-  '_city': '西宁',
-  'is_boy': true,
-};
+String chatUrl = 'http://localhost:11434/v1/chat/completions';
+String model = 'gemma2-2b-Chinese';
+int maxToken=512;
 
 
 class ChatScreen extends StatefulWidget {
@@ -37,10 +25,15 @@ class ChatScreen extends StatefulWidget {
 }
 
 class ChatScreenState extends State<ChatScreen> {
-  List<dynamic> _messages = ['$botMark$defaultGreeting'];
+  List<dynamic> _messages = ['$botMark$defaultSysMsg'];
   Uint8List? latestImage;
   final TextEditingController _textController = TextEditingController();
+  final TextEditingController _sysMsgController = TextEditingController();
+  final TextEditingController _urlController = TextEditingController();
+  final TextEditingController _modelName = TextEditingController();
+  final TextEditingController _maxToken = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  bool _showSetting = false;
   bool sendLock = false;
   String backendUrl = const String.fromEnvironment('backend_url', defaultValue: 'localhost:5418');
   String ollamaUrl = const String.fromEnvironment('ollama_url', defaultValue: 'localhost:11434');
@@ -72,7 +65,7 @@ class ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('👶 Gemma NameCraft'), //：帮你构思宝宝的名字 :D
+        title: const Text('聊天皮'),
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
@@ -85,6 +78,62 @@ class ChatScreenState extends State<ChatScreen> {
       ),
       body: Column(
         children: [
+          if (_showSetting)
+            Column(
+              children: [
+                TextField(
+                  controller: _sysMsgController,
+                  decoration: const InputDecoration(
+                    hintText: 'System Message (default: 你是一个善于助人的人工助手。)',
+                    border: OutlineInputBorder(),
+                  ),
+                  onSubmitted: (value) {
+                    setState(() {
+                      _messages[0] = botMark+_sysMsgController.text;
+                      defaultSysMsg = _sysMsgController.text;
+                    });
+                  },
+                ),
+                TextField(
+                  controller: _urlController,
+                  decoration: const InputDecoration(
+                    hintText: 'Chat Url (default: http://localhost:11434/v1/chat/completions)',
+                    border: OutlineInputBorder(),
+                  ),
+                  onSubmitted: (value) {
+                    setState(() {
+                      chatUrl = _urlController.text;
+                    });
+                  },
+                ),
+                TextField(
+                  controller: _modelName,
+                  decoration: const InputDecoration(
+                    hintText: 'Model Name (default: gemma2-2b-Chinese)',
+                    border: OutlineInputBorder(),
+                  ),
+                  onSubmitted: (value) {
+                    setState(() {
+                      model = _modelName.text.trim().isEmpty ? model : _modelName.text;
+                    });
+                  },
+                ),
+                TextField(
+                  controller: _maxToken,
+                  decoration: const InputDecoration(
+                    hintText: 'Max Token (default: 512)',
+                    border: OutlineInputBorder(),
+                  ),
+                  onSubmitted: (value) {
+                    setState(() {
+                      maxToken = _maxToken.text.trim().isEmpty ? 512: _maxToken.text.trim() as int;
+                    });
+                  },
+                ),
+              ],
+            ),
+
+
           Expanded(
             child: Container(
               color: Colors.grey[200],
@@ -131,7 +180,7 @@ class ChatScreenState extends State<ChatScreen> {
                           color: backgroundColor,
                           child: Padding(
                             padding: const EdgeInsets.all(16.0),
-                            child: MarkdownBody(data: message),
+                            child: MarkdownBody(data: message, selectable: true),
                           ),
                         ),
                       ),
@@ -186,6 +235,14 @@ class ChatScreenState extends State<ChatScreen> {
             ),
             child: Row(
               children: [
+                IconButton(
+                  icon: const Icon(Icons.settings),
+                  onPressed: () {
+                    setState(() {
+                      _showSetting = !_showSetting;
+                    });
+                  },
+                ),
                 IconButton(
                   icon: const Icon(Icons.file_upload),
                   onPressed: () {
@@ -255,7 +312,7 @@ class ChatScreenState extends State<ChatScreen> {
                       return;
                     }
                     setState(() {
-                      _messages = [botMark + defaultGreeting];
+                      _messages = [botMark + defaultSysMsg];
                       chatHistory = [];
                     });
                     latestImage = null;
@@ -265,6 +322,9 @@ class ChatScreenState extends State<ChatScreen> {
                   icon: const Icon(Icons.refresh),
                   onPressed: () {
                     if (sendLock) {
+                      return;
+                    }
+                    if (chatHistory.isEmpty) {
                       return;
                     }
                     var chatLastIndex = chatHistory.length - 1;
@@ -434,13 +494,12 @@ class ChatScreenState extends State<ChatScreen> {
     var headers = {
       'Content-Type': 'application/json'
     };
-    var request = http.Request('POST', Uri.parse('http://$backendUrl/chat/main'));
+    var request = http.Request('POST', Uri.parse(chatUrl));
     request.body = json.encode({
-      "model": "gemma2-2b-Chinese",
+      "model": model,
       "stream": true,
-      "max_tokens": 512,
+      "max_tokens": maxToken,
       "messages": chatHistory,
-      "injected_payload": injectedPayload,
     });
     request.headers.addAll(headers);
 
