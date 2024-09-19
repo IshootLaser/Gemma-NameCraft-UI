@@ -211,7 +211,7 @@ class ChatScreenState extends State<ChatScreen> {
                         },
                         onSubmitted: (value) {
                           setState(() {
-                            maxToken = _maxToken.text.trim().isEmpty ? 512: int.parse(_maxToken.text.trim());
+                            maxToken = _maxToken.text.trim().isEmpty ? 512: int.tryParse(_maxToken.text.trim()) ?? 512;
                             settingMaxToken = editingSettings(false);
                           });
                         },
