@@ -24,6 +24,13 @@ class ChatScreen extends StatefulWidget {
   ChatScreenState createState() => ChatScreenState();
 }
 
+dynamic editingSettings(bool isEditing) {
+  if (isEditing) {
+    return const Icon(Icons.edit, color: Colors.green);
+  }
+  return const Icon(Icons.save, color: Colors.green);
+}
+
 class ChatScreenState extends State<ChatScreen> {
   List<dynamic> _messages = ['$botMark$defaultSysMsg'];
   Uint8List? latestImage;
@@ -39,6 +46,12 @@ class ChatScreenState extends State<ChatScreen> {
   String ollamaUrl = const String.fromEnvironment('ollama_url', defaultValue: 'localhost:11434');
   String paligemmaUrl = const String.fromEnvironment('paligemma_url', defaultValue: 'localhost:5443');
   bool ollamaUnloaded = false;
+  // settings status indicators
+  dynamic settingSysMsg = editingSettings(false);
+  dynamic settingUrl = editingSettings(false);
+  dynamic settingModel = editingSettings(false);
+  dynamic settingMaxToken = editingSettings(false);
+
   List<Map<String, String>> chatHistory = [];
 
   late final _focusNode = FocusNode(
@@ -81,54 +94,130 @@ class ChatScreenState extends State<ChatScreen> {
           if (_showSetting)
             Column(
               children: [
-                TextField(
-                  controller: _sysMsgController,
-                  decoration: const InputDecoration(
-                    hintText: 'System Message (default: 你是一个善于助人的人工助手。)',
-                    border: OutlineInputBorder(),
-                  ),
-                  onSubmitted: (value) {
-                    setState(() {
-                      _messages[0] = botMark+_sysMsgController.text;
-                      defaultSysMsg = _sysMsgController.text;
-                    });
-                  },
+                Row(
+                  children: [
+                    settingSysMsg,
+                    Expanded(
+                      child: TextField(
+                        controller: _sysMsgController,
+                        decoration: const InputDecoration(
+                          hintText: 'System Message (default: 你是一个善于助人的人工助手。)',
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: (value) {
+                          setState(() {
+                            settingSysMsg = editingSettings(true);
+                          });
+                        },
+                        onTapOutside: (value) {
+                          setState(() {
+                            _sysMsgController.text = '';
+                            settingSysMsg = editingSettings(false);
+                          });
+                        },
+                        onSubmitted: (value) {
+                          setState(() {
+                            _messages[0] = botMark+_sysMsgController.text;
+                            defaultSysMsg = _sysMsgController.text;
+                            settingSysMsg = editingSettings(false);
+                          });
+                        },
+                      ),
+                    ),
+                  ],
                 ),
-                TextField(
-                  controller: _urlController,
-                  decoration: const InputDecoration(
-                    hintText: 'Chat Url (default: http://localhost:11434/v1/chat/completions)',
-                    border: OutlineInputBorder(),
-                  ),
-                  onSubmitted: (value) {
-                    setState(() {
-                      chatUrl = _urlController.text;
-                    });
-                  },
+                Row(
+                  children: [
+                    settingUrl,
+                    Expanded(
+                      child: TextField(
+                        controller: _urlController,
+                        decoration: const InputDecoration(
+                          hintText: 'Chat Url (default: http://localhost:11434/v1/chat/completions)',
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: (value) {
+                          setState(() {
+                            settingUrl = editingSettings(true);
+                          });
+                        },
+                        onTapOutside: (value) {
+                          setState(() {
+                            _urlController.text = '';
+                            settingUrl = editingSettings(false);
+                          });
+                        },
+                        onSubmitted: (value) {
+                          setState(() {
+                            chatUrl = _urlController.text;
+                            settingUrl = editingSettings(false);
+                          });
+                        },
+                      ),
+                    ),
+                  ],
                 ),
-                TextField(
-                  controller: _modelName,
-                  decoration: const InputDecoration(
-                    hintText: 'Model Name (default: gemma2-2b-Chinese)',
-                    border: OutlineInputBorder(),
-                  ),
-                  onSubmitted: (value) {
-                    setState(() {
-                      model = _modelName.text.trim().isEmpty ? model : _modelName.text;
-                    });
-                  },
+                Row(
+                  children: [
+                    settingModel,
+                    Expanded(
+                      child: TextField(
+                        controller: _modelName,
+                        decoration: const InputDecoration(
+                          hintText: 'Model Name (default: gemma2-2b-Chinese)',
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: (value) {
+                          setState(() {
+                            settingModel = editingSettings(true);
+                          });
+                        },
+                        onTapOutside: (value) {
+                          setState(() {
+                            _modelName.text = '';
+                            settingModel = editingSettings(false);
+                          });
+                        },
+                        onSubmitted: (value) {
+                          setState(() {
+                            model = _modelName.text.trim().isEmpty ? model : _modelName.text;
+                            settingModel = editingSettings(false);
+                          });
+                        },
+                      ),
+                    ),
+                  ],
                 ),
-                TextField(
-                  controller: _maxToken,
-                  decoration: const InputDecoration(
-                    hintText: 'Max Token (default: 512)',
-                    border: OutlineInputBorder(),
-                  ),
-                  onSubmitted: (value) {
-                    setState(() {
-                      maxToken = _maxToken.text.trim().isEmpty ? 512: _maxToken.text.trim() as int;
-                    });
-                  },
+                Row(
+                  children: [
+                    settingMaxToken,
+                    Expanded(
+                      child: TextField(
+                        controller: _maxToken,
+                        decoration: const InputDecoration(
+                          hintText: 'Max Token (default: 512)',
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: (value) {
+                          setState(() {
+                            settingMaxToken = editingSettings(true);
+                          });
+                        },
+                        onTapOutside: (value) {
+                          setState(() {
+                            _maxToken.text = '';
+                            settingMaxToken = editingSettings(false);
+                          });
+                        },
+                        onSubmitted: (value) {
+                          setState(() {
+                            maxToken = _maxToken.text.trim().isEmpty ? 512: int.parse(_maxToken.text.trim());
+                            settingMaxToken = editingSettings(false);
+                          });
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -243,17 +332,18 @@ class ChatScreenState extends State<ChatScreen> {
                     });
                   },
                 ),
-                IconButton(
-                  icon: const Icon(Icons.file_upload),
-                  onPressed: () {
-                    if (sendLock) {
-                      return;
-                    }
-                    modelSwap();
-                    _getImage();
-                    _focusNode.requestFocus();
-                  },
-                ),
+                // For calling VLM models
+                // IconButton(
+                //   icon: const Icon(Icons.file_upload),
+                //   onPressed: () {
+                //     if (sendLock) {
+                //       return;
+                //     }
+                //     modelSwap();
+                //     _getImage();
+                //     _focusNode.requestFocus();
+                //   },
+                // ),
                 SizedBox(
                   width: 58,
                   height: 42,
@@ -513,6 +603,9 @@ class ChatScreenState extends State<ChatScreen> {
       http.StreamedResponse response = await request.send();
       stringStream = response.stream.transform(utf8.decoder).transform(const LineSplitter());
     }
+    bool keepScrolling = true;
+    double position = _scrollController.position.pixels;
+    double threshold = MediaQuery.of(context).size.height * 0.2;
     await for (String jsonString in stringStream) {
       jsonString = jsonString.replaceAll('data: ', '').trim();
       if (jsonString.trimRight().endsWith('[DONE]')) {
@@ -529,6 +622,17 @@ class ChatScreenState extends State<ChatScreen> {
         _messages[lastMessageIndex] += content;
       });
 
+      if ((_scrollController.position.pixels - position).abs() < threshold) {
+        keepScrolling = true;
+      }
+      else {
+        keepScrolling = false;
+      }
+
+      if (!keepScrolling) {
+        continue;
+      }
+
       Future.delayed(const Duration(milliseconds: 50), () {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
@@ -538,6 +642,7 @@ class ChatScreenState extends State<ChatScreen> {
       });
       // wait for the animation to finish
       await Future.delayed(const Duration(milliseconds: 11));
+      position = _scrollController.position.pixels;
     }
     chatHistory.add({'role': 'assistant', 'content': _messages.last.replaceAll(botMark, '')});
     ollamaUnloaded = false;
