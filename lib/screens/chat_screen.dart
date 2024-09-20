@@ -1,21 +1,27 @@
 import 'dart:convert';
 
+import 'package:fetch_client/fetch_client.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
 import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:fetch_client/fetch_client.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:http/http.dart' as http;
 
 const String botMark = 'Bot##';
-String defaultSysMsg = '''
-你是一个善于助人的人工助手。
-''';
-String chatUrl = 'http://localhost:11434/v1/chat/completions';
-String model = 'gemma2-2b-Chinese';
-int maxToken=512;
 
+Map<String, dynamic> chatSettings = {
+  'defaultSysMsg': '你是一个善于助人的人工助手。',
+  'chatUrl': 'http://localhost:11434/v1/chat/completions',
+  'model': 'gemma2-2b-Chinese',
+  'maxToken': 512,
+  // settings status indicators
+  'settingSysMsg': editingSettings(false),
+  'settingUrl': editingSettings(false),
+  'settingModel': editingSettings(false),
+  'settingMaxToken': editingSettings(false)
+};
+Map<String, dynamic> modifiedChatSettings = Map.from(chatSettings);
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -24,7 +30,7 @@ class ChatScreen extends StatefulWidget {
   ChatScreenState createState() => ChatScreenState();
 }
 
-dynamic editingSettings(bool isEditing) {
+Icon editingSettings(bool isEditing) {
   if (isEditing) {
     return const Icon(Icons.edit, color: Colors.green);
   }
@@ -32,7 +38,9 @@ dynamic editingSettings(bool isEditing) {
 }
 
 class ChatScreenState extends State<ChatScreen> {
-  List<dynamic> _messages = ['$botMark$defaultSysMsg'];
+  List<dynamic> _messages = [
+    '$botMark${modifiedChatSettings['defaultSysMsg']}'
+  ];
   Uint8List? latestImage;
   final TextEditingController _textController = TextEditingController();
   final TextEditingController _sysMsgController = TextEditingController();
@@ -42,15 +50,13 @@ class ChatScreenState extends State<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
   bool _showSetting = false;
   bool sendLock = false;
-  String backendUrl = const String.fromEnvironment('backend_url', defaultValue: 'localhost:5418');
-  String ollamaUrl = const String.fromEnvironment('ollama_url', defaultValue: 'localhost:11434');
-  String paligemmaUrl = const String.fromEnvironment('paligemma_url', defaultValue: 'localhost:5443');
+  String backendUrl = const String.fromEnvironment('backend_url',
+      defaultValue: 'localhost:5418');
+  String ollamaUrl = const String.fromEnvironment('ollama_url',
+      defaultValue: 'localhost:11434');
+  String paligemmaUrl = const String.fromEnvironment('paligemma_url',
+      defaultValue: 'localhost:5443');
   bool ollamaUnloaded = false;
-  // settings status indicators
-  dynamic settingSysMsg = editingSettings(false);
-  dynamic settingUrl = editingSettings(false);
-  dynamic settingModel = editingSettings(false);
-  dynamic settingMaxToken = editingSettings(false);
 
   List<Map<String, String>> chatHistory = [];
 
@@ -61,8 +67,7 @@ class ChatScreenState extends State<ChatScreen> {
           _sendMessage();
         }
         return KeyEventResult.handled;
-      }
-      else {
+      } else {
         return KeyEventResult.ignored;
       }
     },
@@ -81,12 +86,11 @@ class ChatScreenState extends State<ChatScreen> {
         title: const Text('聊天皮'),
         flexibleSpace: Container(
           decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.orange, Colors.purple],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            )
-          ),
+              gradient: LinearGradient(
+            colors: [Colors.orange, Colors.purple],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          )),
         ),
       ),
       body: Column(
@@ -96,133 +100,52 @@ class ChatScreenState extends State<ChatScreen> {
               children: [
                 Row(
                   children: [
-                    settingSysMsg,
+                    modifiedChatSettings['settingSysMsg'],
                     Expanded(
-                      child: TextField(
-                        controller: _sysMsgController,
-                        decoration: const InputDecoration(
-                          hintText: 'System Message (default: 你是一个善于助人的人工助手。)',
-                          border: OutlineInputBorder(),
-                        ),
-                        onChanged: (value) {
-                          setState(() {
-                            settingSysMsg = editingSettings(true);
-                          });
-                        },
-                        onTapOutside: (value) {
-                          setState(() {
-                            _sysMsgController.text = '';
-                            settingSysMsg = editingSettings(false);
-                          });
-                        },
-                        onSubmitted: (value) {
-                          setState(() {
-                            _messages[0] = botMark+_sysMsgController.text;
-                            defaultSysMsg = _sysMsgController.text;
-                            settingSysMsg = editingSettings(false);
-                          });
-                        },
-                      ),
-                    ),
+                        child: editSettingWidget(
+                            _sysMsgController,
+                            'System Message (default: 你是一个善于助人的人工助手。)',
+                            'settingSysMsg',
+                            'defaultSysMsg', () {
+                      _messages[0] = botMark + _sysMsgController.text;
+                    })),
                   ],
                 ),
                 Row(
                   children: [
-                    settingUrl,
+                    modifiedChatSettings['settingUrl'],
                     Expanded(
-                      child: TextField(
-                        controller: _urlController,
-                        decoration: const InputDecoration(
-                          hintText: 'Chat Url (default: http://localhost:11434/v1/chat/completions)',
-                          border: OutlineInputBorder(),
-                        ),
-                        onChanged: (value) {
-                          setState(() {
-                            settingUrl = editingSettings(true);
-                          });
-                        },
-                        onTapOutside: (value) {
-                          setState(() {
-                            _urlController.text = '';
-                            settingUrl = editingSettings(false);
-                          });
-                        },
-                        onSubmitted: (value) {
-                          setState(() {
-                            chatUrl = _urlController.text;
-                            settingUrl = editingSettings(false);
-                          });
-                        },
-                      ),
-                    ),
+                        child: editSettingWidget(
+                            _urlController,
+                            'Chat Url (default: http://localhost:11434/v1/chat/completions)',
+                            'settingUrl',
+                            'chatUrl')),
                   ],
                 ),
                 Row(
                   children: [
-                    settingModel,
+                    modifiedChatSettings['settingModel'],
                     Expanded(
-                      child: TextField(
-                        controller: _modelName,
-                        decoration: const InputDecoration(
-                          hintText: 'Model Name (default: gemma2-2b-Chinese)',
-                          border: OutlineInputBorder(),
-                        ),
-                        onChanged: (value) {
-                          setState(() {
-                            settingModel = editingSettings(true);
-                          });
-                        },
-                        onTapOutside: (value) {
-                          setState(() {
-                            _modelName.text = '';
-                            settingModel = editingSettings(false);
-                          });
-                        },
-                        onSubmitted: (value) {
-                          setState(() {
-                            model = _modelName.text.trim().isEmpty ? model : _modelName.text;
-                            settingModel = editingSettings(false);
-                          });
-                        },
-                      ),
-                    ),
+                        child: editSettingWidget(
+                            _modelName,
+                            'Model Name (default: gemma2-2b-Chinese)',
+                            'settingModel',
+                            'model')),
                   ],
                 ),
                 Row(
                   children: [
-                    settingMaxToken,
+                    modifiedChatSettings['settingMaxToken'],
                     Expanded(
-                      child: TextField(
-                        controller: _maxToken,
-                        decoration: const InputDecoration(
-                          hintText: 'Max Token (default: 512)',
-                          border: OutlineInputBorder(),
-                        ),
-                        onChanged: (value) {
-                          setState(() {
-                            settingMaxToken = editingSettings(true);
-                          });
-                        },
-                        onTapOutside: (value) {
-                          setState(() {
-                            _maxToken.text = '';
-                            settingMaxToken = editingSettings(false);
-                          });
-                        },
-                        onSubmitted: (value) {
-                          setState(() {
-                            maxToken = _maxToken.text.trim().isEmpty ? 512: int.tryParse(_maxToken.text.trim()) ?? 512;
-                            settingMaxToken = editingSettings(false);
-                          });
-                        },
-                      ),
-                    ),
+                        child: editSettingWidget(
+                            _maxToken,
+                            'Max Token (default: 512)',
+                            'settingMaxToken',
+                            'maxToken')),
                   ],
                 ),
               ],
             ),
-
-
           Expanded(
             child: Container(
               color: Colors.grey[200],
@@ -241,19 +164,16 @@ class ChatScreenState extends State<ChatScreen> {
                     if (message.startsWith(botMark)) {
                       isUserMessage = false;
                       message = message.replaceAll(botMark, '');
-                    }
-                    else {
+                    } else {
                       isUserMessage = true;
                     }
-                  }
-                  else {
+                  } else {
                     isUserMessage = true;
                   }
                   if (isUserMessage) {
                     alignment = AlignmentDirectional.centerEnd;
                     backgroundColor = Colors.lightGreen[100];
-                  }
-                  else {
+                  } else {
                     alignment = AlignmentDirectional.centerStart;
                     backgroundColor = null;
                   }
@@ -261,7 +181,8 @@ class ChatScreenState extends State<ChatScreen> {
                   var imageHeight = MediaQuery.of(context).size.height * 0.5;
                   if (message is String) {
                     return Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 8.0, horizontal: 16.0),
                       alignment: alignment,
                       child: SizedBox(
                         width: width,
@@ -269,14 +190,16 @@ class ChatScreenState extends State<ChatScreen> {
                           color: backgroundColor,
                           child: Padding(
                             padding: const EdgeInsets.all(16.0),
-                            child: MarkdownBody(data: message, selectable: true),
+                            child:
+                                MarkdownBody(data: message, selectable: true),
                           ),
                         ),
                       ),
                     );
                   } else if (message is Uint8List) {
                     return Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 8.0, horizontal: 16.0),
                       alignment: alignment,
                       child: SizedBox(
                         width: width,
@@ -285,17 +208,15 @@ class ChatScreenState extends State<ChatScreen> {
                           color: backgroundColor,
                           child: Padding(
                             padding: const EdgeInsets.all(16.0),
-                            child: Image.memory(
-                                message,
-                                fit: BoxFit.contain
-                            ),
+                            child: Image.memory(message, fit: BoxFit.contain),
                           ),
                         ),
                       ),
                     );
                   }
                   return Container(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 8.0, horizontal: 16.0),
                     alignment: alignment,
                     child: SizedBox(
                       width: MediaQuery.of(context).size.width * 0.8,
@@ -350,32 +271,32 @@ class ChatScreenState extends State<ChatScreen> {
                   child: latestImage != null
                       ? Image.memory(latestImage!)
                       : const ColorFiltered(
-                        colorFilter: ColorFilter.mode(Colors.grey, BlendMode.srcIn),
-                        child: Icon(Icons.image_not_supported),
-                      ),
+                          colorFilter:
+                              ColorFilter.mode(Colors.grey, BlendMode.srcIn),
+                          child: Icon(Icons.image_not_supported),
+                        ),
                 ),
                 Expanded(
-                  child: LimitedBox(
-                    maxHeight: MediaQuery.of(context).size.width * 0.15,
-                    child: TextField(
-                      controller: _textController,
-                      decoration: const InputDecoration(
-                        hintText: 'Type a message',
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.all(10.0),
-                      ),
-                      focusNode: _focusNode,
-                      keyboardType: TextInputType.multiline,
-                      textInputAction: TextInputAction.newline,
-                      minLines: 1,
-                      maxLines: 32,
-                      onSubmitted: (value) {
-                        _sendMessage();
-                        _focusNode.requestFocus();
-                      },
+                    child: LimitedBox(
+                  maxHeight: MediaQuery.of(context).size.width * 0.15,
+                  child: TextField(
+                    controller: _textController,
+                    decoration: const InputDecoration(
+                      hintText: 'Type a message',
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.all(10.0),
                     ),
-                  )
-                ),
+                    focusNode: _focusNode,
+                    keyboardType: TextInputType.multiline,
+                    textInputAction: TextInputAction.newline,
+                    minLines: 1,
+                    maxLines: 32,
+                    onSubmitted: (value) {
+                      _sendMessage();
+                      _focusNode.requestFocus();
+                    },
+                  ),
+                )),
                 IconButton(
                   icon: const Icon(Icons.arrow_downward),
                   onPressed: () {
@@ -402,10 +323,13 @@ class ChatScreenState extends State<ChatScreen> {
                       return;
                     }
                     setState(() {
-                      _messages = [botMark + defaultSysMsg];
+                      _messages = [
+                        botMark + modifiedChatSettings['defaultSysMsg']
+                      ];
                       chatHistory = [];
                     });
                     latestImage = null;
+                    modifiedChatSettings = Map.from(chatSettings);
                   },
                 ),
                 IconButton(
@@ -469,15 +393,17 @@ class ChatScreenState extends State<ChatScreen> {
     if (img != null) {
       String caption = await imageToTextReply(img);
       caption = await translateCaption(caption);
-      msg = '$caption<imageCaption>用户上传了一张照片,同时问道：${_messages.last}\n用户可能想结合图片和文字像你提问。你的回复是：';
+      msg =
+          '$caption<imageCaption>用户上传了一张照片,同时问道：${_messages.last}\n用户可能想结合图片和文字像你提问。你的回复是：';
     }
     getTextReply(msg);
   }
 
   Future<void> _getImage() async {
     final pickedFile = await FilePicker.platform.pickFiles(
-        type: FileType.custom, allowedExtensions: ['jpg', 'jpeg', 'png'], withData: true
-    );
+        type: FileType.custom,
+        allowedExtensions: ['jpg', 'jpeg', 'png'],
+        withData: true);
 
     if (pickedFile != null) {
       setState(() {
@@ -487,7 +413,8 @@ class ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> fakeReply() async {
-    const fake = 'I am a test bot. I am not capable of replying to your message.';
+    const fake =
+        'I am a test bot. I am not capable of replying to your message.';
     final words = fake.split(' ');
     _messages.add(botMark);
     var lastMessageIndex = _messages.length - 1;
@@ -506,9 +433,7 @@ class ChatScreenState extends State<ChatScreen> {
     if (ollamaUnloaded) {
       return;
     }
-    var headers = {
-      'Content-Type': 'application/json'
-    };
+    var headers = {'Content-Type': 'application/json'};
     var body = json.encode({
       "model": "gemma2-2b-Chinese",
       "keep_alive": 0,
@@ -530,23 +455,24 @@ class ChatScreenState extends State<ChatScreen> {
     var headers = {
       'Content-Type': 'application/json',
     };
-    var request = http.Request('POST', Uri.parse('http://$paligemmaUrl/generate'));
-    request.body = json.encode({
-      'prompt': prompt,
-      'image': imageBase64,
-      'sample': true
-    });
+    var request =
+        http.Request('POST', Uri.parse('http://$paligemmaUrl/generate'));
+    request.body =
+        json.encode({'prompt': prompt, 'image': imageBase64, 'sample': true});
     request.headers.addAll(headers);
 
     Stream<String> stringStream;
     if (kIsWeb) {
       var client = FetchClient(mode: RequestMode.cors);
       final response = await client.send(request);
-      stringStream = response.stream.transform(utf8.decoder).transform(const LineSplitter());
-    }
-    else {
+      stringStream = response.stream
+          .transform(utf8.decoder)
+          .transform(const LineSplitter());
+    } else {
       http.StreamedResponse response = await request.send();
-      stringStream = response.stream.transform(utf8.decoder).transform(const LineSplitter());
+      stringStream = response.stream
+          .transform(utf8.decoder)
+          .transform(const LineSplitter());
     }
 
     await for (String jsonString in stringStream) {
@@ -577,18 +503,17 @@ class ChatScreenState extends State<ChatScreen> {
     var userMsg = msg ?? _messages.last;
     _messages.add(botMark);
     var lastMessageIndex = _messages.length - 1;
-    chatHistory.add({'role': 'system', 'content': defaultSysMsg});
+    chatHistory.add(
+        {'role': 'system', 'content': modifiedChatSettings['defaultSysMsg']});
     chatHistory.add({'role': 'user', 'content': userMsg});
 
-
-    var headers = {
-      'Content-Type': 'application/json'
-    };
-    var request = http.Request('POST', Uri.parse(chatUrl));
+    var headers = {'Content-Type': 'application/json'};
+    var request =
+        http.Request('POST', Uri.parse(modifiedChatSettings['chatUrl']));
     request.body = json.encode({
-      "model": model,
+      "model": modifiedChatSettings['model'],
       "stream": true,
-      "max_tokens": maxToken,
+      "max_tokens": modifiedChatSettings['maxToken'],
       "messages": chatHistory,
     });
     request.headers.addAll(headers);
@@ -597,11 +522,14 @@ class ChatScreenState extends State<ChatScreen> {
     if (kIsWeb) {
       var client = FetchClient(mode: RequestMode.cors);
       final response = await client.send(request);
-      stringStream = response.stream.transform(utf8.decoder).transform(const LineSplitter());
-    }
-    else {
+      stringStream = response.stream
+          .transform(utf8.decoder)
+          .transform(const LineSplitter());
+    } else {
       http.StreamedResponse response = await request.send();
-      stringStream = response.stream.transform(utf8.decoder).transform(const LineSplitter());
+      stringStream = response.stream
+          .transform(utf8.decoder)
+          .transform(const LineSplitter());
     }
     bool keepScrolling = true;
     double position = _scrollController.position.pixels;
@@ -624,8 +552,7 @@ class ChatScreenState extends State<ChatScreen> {
 
       if ((_scrollController.position.pixels - position).abs() < threshold) {
         keepScrolling = true;
-      }
-      else {
+      } else {
         keepScrolling = false;
       }
 
@@ -644,7 +571,10 @@ class ChatScreenState extends State<ChatScreen> {
       await Future.delayed(const Duration(milliseconds: 11));
       position = _scrollController.position.pixels;
     }
-    chatHistory.add({'role': 'assistant', 'content': _messages.last.replaceAll(botMark, '')});
+    chatHistory.add({
+      'role': 'assistant',
+      'content': _messages.last.replaceAll(botMark, '')
+    });
     ollamaUnloaded = false;
     sendLock = false;
   }
@@ -661,25 +591,24 @@ class ChatScreenState extends State<ChatScreen> {
   Future<String> translateCaption(String caption) async {
     String transcription = '';
     _messages.last += '  \n中文翻译：';
-    var headers = {
-      'Content-Type': 'application/json'
-    };
-    var request = http.Request('POST', Uri.parse('http://$backendUrl/transcribe'));
-    request.body = json.encode({
-      "prompt": caption,
-      "stream": true
-    });
+    var headers = {'Content-Type': 'application/json'};
+    var request =
+        http.Request('POST', Uri.parse('http://$backendUrl/transcribe'));
+    request.body = json.encode({"prompt": caption, "stream": true});
     request.headers.addAll(headers);
 
     Stream<String> stringStream;
     if (kIsWeb) {
       var client = FetchClient(mode: RequestMode.cors);
       final response = await client.send(request);
-      stringStream = response.stream.transform(utf8.decoder).transform(const LineSplitter());
-    }
-    else {
+      stringStream = response.stream
+          .transform(utf8.decoder)
+          .transform(const LineSplitter());
+    } else {
       http.StreamedResponse response = await request.send();
-      stringStream = response.stream.transform(utf8.decoder).transform(const LineSplitter());
+      stringStream = response.stream
+          .transform(utf8.decoder)
+          .transform(const LineSplitter());
     }
     await for (String jsonString in stringStream) {
       jsonString = jsonString.replaceAll('data: ', '').trim();
@@ -705,5 +634,49 @@ class ChatScreenState extends State<ChatScreen> {
       await Future.delayed(const Duration(milliseconds: 11));
     }
     return transcription;
+  }
+
+  TextField editSettingWidget(TextEditingController controller, String hintText,
+      String settingIcon, String setting,
+      [void Function()? callback]) {
+    return TextField(
+      controller: controller,
+      decoration: InputDecoration(
+        hintText: hintText,
+        border: const OutlineInputBorder(),
+      ),
+      onChanged: (value) {
+        setState(() {
+          modifiedChatSettings[settingIcon] = editingSettings(true);
+        });
+      },
+      onTapOutside: (value) {
+        setState(() {
+          controller.text = '';
+          modifiedChatSettings[settingIcon] = editingSettings(false);
+        });
+      },
+      onSubmitted: (value) {
+        setState(() {
+          switch (modifiedChatSettings[setting]) {
+            case String _:
+              modifiedChatSettings[setting] =
+                  controller.text.trim().isEmpty ? setting : controller.text;
+              if (callback != null) {
+                callback();
+              }
+              break;
+            case int _:
+              modifiedChatSettings[setting] = controller.text.trim().isEmpty
+                  ? setting
+                  : int.tryParse(controller.text.trim()) ?? setting;
+              break;
+            default:
+              throw Exception('Unsupported setting type');
+          }
+          modifiedChatSettings[settingIcon] = editingSettings(false);
+        });
+      },
+    );
   }
 }
